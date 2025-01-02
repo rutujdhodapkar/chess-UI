@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>3D Chess Game</title>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@lichess-org/chessground@8.1.0/dist/chessground.min.js"></script>
     <style>
         body {
             margin: 0;
@@ -141,6 +143,23 @@
             text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
         }
 
+        .move-hint {
+            position: absolute;
+            width: 30%;
+            height: 30%;
+            border-radius: 50%;
+            background: rgba(144, 238, 144, 0.5);
+            pointer-events: none;
+        }
+
+        .check-indicator {
+            background: rgba(255, 0, 0, 0.3) !important;
+        }
+
+        .last-move {
+            background: rgba(255, 255, 0, 0.2) !important;
+        }
+
         @keyframes slideIn {
             from { transform: translateX(-100%); opacity: 0; }
             to { transform: translateX(0); opacity: 1; }
@@ -158,12 +177,19 @@
             font-size: 1.1em;
             color: rgba(255,255,255,0.9);
         }
+
+        .game-status {
+            color: #ff4444;
+            font-weight: bold;
+            margin-top: 10px;
+        }
     </style>
 </head>
 <body>
     <div class="game-info">
         <h2>Current Turn: White</h2>
         <p>Move Count: <span id="moveCount">0</span></p>
+        <p class="game-status" id="gameStatus"></p>
     </div>
 
     <div class="game-container">
@@ -178,8 +204,11 @@
     <script>
         const board = document.getElementById('chessboard');
         let selectedPiece = null;
-        let currentTurn = 'white';
         let moveCount = 0;
+        let lastMove = null;
+
+        // Initialize chess.js
+        const chess = new Chess();
 
         const pieceImages = {
             'wp': 'https://upload.wikimedia.org/wikipedia/commons/4/45/Chess_plt45.svg',
@@ -196,21 +225,10 @@
             'bk': 'https://upload.wikimedia.org/wikipedia/commons/f/f0/Chess_kdt45.svg'
         };
 
-        const initialSetup = [
-            ['br', 'bn', 'bb', 'bq', 'bk', 'bb', 'bn', 'br'],
-            ['bp', 'bp', 'bp', 'bp', 'bp', 'bp', 'bp', 'bp'],
-            Array(8).fill(''),
-            Array(8).fill(''),
-            Array(8).fill(''),
-            Array(8).fill(''),
-            ['wp', 'wp', 'wp', 'wp', 'wp', 'wp', 'wp', 'wp'],
-            ['wr', 'wn', 'wb', 'wq', 'wk', 'wb', 'wn', 'wr']
-        ];
-
-        let gameState = JSON.parse(JSON.stringify(initialSetup));
-
         function createBoard() {
             board.innerHTML = '';
+            const position = chess.board();
+            
             for (let i = 0; i < 8; i++) {
                 for (let j = 0; j < 8; j++) {
                     const square = document.createElement('div');
@@ -218,16 +236,29 @@
                     square.dataset.row = i;
                     square.dataset.col = j;
                     
-                    if (gameState[i][j]) {
-                        const piece = document.createElement('img');
-                        piece.className = 'piece';
-                        piece.src = pieceImages[gameState[i][j]];
-                        square.appendChild(piece);
+                    const piece = position[i][j];
+                    if (piece) {
+                        const pieceImg = document.createElement('img');
+                        pieceImg.className = 'piece';
+                        const color = piece.color === 'w' ? 'w' : 'b';
+                        pieceImg.src = pieceImages[color + piece.type];
+                        square.appendChild(pieceImg);
                     }
                     
                     square.addEventListener('click', handleSquareClick);
                     board.appendChild(square);
                 }
+            }
+
+            // Highlight king if in check
+            if (chess.in_check()) {
+                const color = chess.turn() === 'w' ? 'w' : 'b';
+                highlightCheck(color);
+            }
+
+            // Highlight last move
+            if (lastMove) {
+                highlightLastMove(lastMove.from, lastMove.to);
             }
         }
 
@@ -235,138 +266,94 @@
             const square = e.target.closest('.square');
             const row = parseInt(square.dataset.row);
             const col = parseInt(square.dataset.col);
+            const squareNotation = toAlgebraic(row, col);
 
             if (!selectedPiece) {
-                if (gameState[row][col] && gameState[row][col][0] === (currentTurn === 'white' ? 'w' : 'b')) {
-                    selectedPiece = {row, col};
-                    highlightValidMoves(row, col);
+                const piece = chess.get(squareNotation);
+                if (piece && piece.color === chess.turn()) {
+                    selectedPiece = squareNotation;
+                    highlightValidMoves(squareNotation);
                 }
             } else {
-                if (isValidMove(selectedPiece.row, selectedPiece.col, row, col)) {
-                    movePiece(selectedPiece.row, selectedPiece.col, row, col);
-                    selectedPiece = null;
-                    currentTurn = currentTurn === 'white' ? 'black' : 'white';
+                const move = {
+                    from: selectedPiece,
+                    to: squareNotation,
+                    promotion: 'q' // Always promote to queen for simplicity
+                };
+
+                if (chess.move(move)) {
+                    lastMove = move;
                     moveCount++;
                     updateGameInfo();
+                    createBoard();
+                    
+                    // Check game status
+                    if (chess.game_over()) {
+                        let status = '';
+                        if (chess.in_checkmate()) status = 'Checkmate!';
+                        else if (chess.in_draw()) status = 'Draw!';
+                        else if (chess.in_stalemate()) status = 'Stalemate!';
+                        document.getElementById('gameStatus').textContent = status;
+                    }
                 }
+                
+                selectedPiece = null;
                 removeHighlights();
             }
         }
 
-        function highlightValidMoves(row, col) {
+        function highlightValidMoves(square) {
             removeHighlights();
-            for(let i = 0; i < 8; i++) {
-                for(let j = 0; j < 8; j++) {
-                    if(isValidMove(row, col, i, j)) {
+            const moves = chess.moves({ square: square, verbose: true });
+            
+            moves.forEach(move => {
+                const targetSquare = document.querySelector(`[data-row="${fromAlgebraic(move.to).row}"][data-col="${fromAlgebraic(move.to).col}"]`);
+                const hint = document.createElement('div');
+                hint.className = 'move-hint';
+                targetSquare.appendChild(hint);
+            });
+        }
+
+        function highlightCheck(color) {
+            const position = chess.board();
+            for (let i = 0; i < 8; i++) {
+                for (let j = 0; j < 8; j++) {
+                    const piece = position[i][j];
+                    if (piece && piece.type === 'k' && piece.color === color) {
                         const square = document.querySelector(`[data-row="${i}"][data-col="${j}"]`);
-                        square.style.backgroundColor = 'rgba(144, 238, 144, 0.5)';
+                        square.classList.add('check-indicator');
                     }
                 }
             }
         }
 
+        function highlightLastMove(from, to) {
+            const fromSquare = document.querySelector(`[data-row="${fromAlgebraic(from).row}"][data-col="${fromAlgebraic(from).col}"]`);
+            const toSquare = document.querySelector(`[data-row="${fromAlgebraic(to).row}"][data-col="${fromAlgebraic(to).col}"]`);
+            
+            fromSquare.classList.add('last-move');
+            toSquare.classList.add('last-move');
+        }
+
         function removeHighlights() {
-            document.querySelectorAll('.square').forEach(square => {
-                square.style.backgroundColor = '';
-            });
+            document.querySelectorAll('.move-hint').forEach(hint => hint.remove());
+            document.querySelectorAll('.check-indicator').forEach(square => square.classList.remove('check-indicator'));
         }
 
-        function isValidMove(fromRow, fromCol, toRow, toCol) {
-            const piece = gameState[fromRow][fromCol];
-            const targetPiece = gameState[toRow][toCol];
-            
-            // Can't capture own pieces
-            if(targetPiece && targetPiece[0] === piece[0]) return false;
-            
-            const pieceType = piece[1];
-            const isWhite = piece[0] === 'w';
-            const rowDiff = toRow - fromRow;
-            const colDiff = toCol - fromCol;
-            const absRowDiff = Math.abs(rowDiff);
-            const absColDiff = Math.abs(colDiff);
-
-            switch(pieceType) {
-                case 'p': // Pawn
-                    if(isWhite) {
-                        // Normal move
-                        if(colDiff === 0 && rowDiff === -1 && !targetPiece) return true;
-                        // Initial double move
-                        if(colDiff === 0 && rowDiff === -2 && fromRow === 6 && !targetPiece && !gameState[fromRow-1][fromCol]) return true;
-                        // Capture
-                        if(absColDiff === 1 && rowDiff === -1 && targetPiece) return true;
-                    } else {
-                        // Normal move
-                        if(colDiff === 0 && rowDiff === 1 && !targetPiece) return true;
-                        // Initial double move
-                        if(colDiff === 0 && rowDiff === 2 && fromRow === 1 && !targetPiece && !gameState[fromRow+1][fromCol]) return true;
-                        // Capture
-                        if(absColDiff === 1 && rowDiff === 1 && targetPiece) return true;
-                    }
-                    return false;
-
-                case 'r': // Rook
-                    if(rowDiff === 0 || colDiff === 0) {
-                        return !isPieceBetween(fromRow, fromCol, toRow, toCol);
-                    }
-                    return false;
-
-                case 'n': // Knight
-                    return (absRowDiff === 2 && absColDiff === 1) || (absRowDiff === 1 && absColDiff === 2);
-
-                case 'b': // Bishop
-                    if(absRowDiff === absColDiff) {
-                        return !isPieceBetween(fromRow, fromCol, toRow, toCol);
-                    }
-                    return false;
-
-                case 'q': // Queen
-                    if(rowDiff === 0 || colDiff === 0 || absRowDiff === absColDiff) {
-                        return !isPieceBetween(fromRow, fromCol, toRow, toCol);
-                    }
-                    return false;
-
-                case 'k': // King
-                    return absRowDiff <= 1 && absColDiff <= 1;
-            }
-            return false;
+        function toAlgebraic(row, col) {
+            return `${String.fromCharCode(97 + col)}${8 - row}`;
         }
 
-        function isPieceBetween(fromRow, fromCol, toRow, toCol) {
-            const rowStep = fromRow === toRow ? 0 : (toRow - fromRow) / Math.abs(toRow - fromRow);
-            const colStep = fromCol === toCol ? 0 : (toCol - fromCol) / Math.abs(toCol - fromCol);
-            
-            let currentRow = fromRow + rowStep;
-            let currentCol = fromCol + colStep;
-            
-            while(currentRow !== toRow || currentCol !== toCol) {
-                if(gameState[currentRow][currentCol] !== '') return true;
-                currentRow += rowStep;
-                currentCol += colStep;
-            }
-            return false;
-        }
-
-        function movePiece(fromRow, fromCol, toRow, toCol) {
-            const capturedPiece = gameState[toRow][toCol];
-            if(capturedPiece) {
-                const container = capturedPiece[0] === 'w' ? 
-                    document.querySelector('.captured-black') : 
-                    document.querySelector('.captured-white');
-                const capturedImg = document.createElement('img');
-                capturedImg.src = pieceImages[capturedPiece];
-                capturedImg.style.width = '30px';
-                capturedImg.style.height = '30px';
-                container.appendChild(capturedImg);
-            }
-            
-            gameState[toRow][toCol] = gameState[fromRow][fromCol];
-            gameState[fromRow][fromCol] = '';
-            createBoard();
+        function fromAlgebraic(square) {
+            return {
+                row: 8 - parseInt(square[1]),
+                col: square.charCodeAt(0) - 97
+            };
         }
 
         function updateGameInfo() {
             document.querySelector('.game-info h2').textContent = `Current Turn: ${
-                currentTurn.charAt(0).toUpperCase() + currentTurn.slice(1)
+                chess.turn() === 'w' ? 'White' : 'Black'
             }`;
             document.getElementById('moveCount').textContent = moveCount;
         }
