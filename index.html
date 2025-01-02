@@ -148,8 +148,13 @@
             width: 30%;
             height: 30%;
             border-radius: 50%;
-            background: rgba(144, 238, 144, 0.5);
+            background: rgba(34, 0, 255, 0.552); /* Changed color to blue */
             pointer-events: none;
+        }
+
+        .takeable {
+            border: 3px solid red;
+            z-index: 1;
         }
 
         .check-indicator {
@@ -183,6 +188,39 @@
             font-weight: bold;
             margin-top: 10px;
         }
+
+        .move-list {
+            position: fixed;
+            right: 30px;
+            bottom: 30px;
+            width: 200px;
+            max-height: 300px;
+            overflow-y: auto;
+            background: rgba(255,255,255,0.1);
+            padding: 20px;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .move-list h3 {
+            margin: 0 0 10px;
+            font-size: 1.2em;
+            color: #fff;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .move-list ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            color: rgba(255,255,255,0.9);
+        }
+
+        .move-list li {
+            margin-bottom: 5px;
+        }
     </style>
 </head>
 <body>
@@ -199,6 +237,11 @@
     <div class="captured-pieces">
         <div class="captured-white"></div>
         <div class="captured-black"></div>
+    </div>
+
+    <div class="move-list">
+        <h3>Moves</h3>
+        <ul id="moveList"></ul>
     </div>
 
     <script>
@@ -286,6 +329,7 @@
                     moveCount++;
                     updateGameInfo();
                     createBoard();
+                    updateMoveList();
                     
                     // Check game status
                     if (chess.game_over()) {
@@ -311,6 +355,11 @@
                 const hint = document.createElement('div');
                 hint.className = 'move-hint';
                 targetSquare.appendChild(hint);
+
+                // Highlight takeable pieces
+                if (move.captured) {
+                    targetSquare.classList.add('takeable');
+                }
             });
         }
 
@@ -338,6 +387,7 @@
         function removeHighlights() {
             document.querySelectorAll('.move-hint').forEach(hint => hint.remove());
             document.querySelectorAll('.check-indicator').forEach(square => square.classList.remove('check-indicator'));
+            document.querySelectorAll('.takeable').forEach(square => square.classList.remove('takeable'));
         }
 
         function toAlgebraic(row, col) {
@@ -356,6 +406,17 @@
                 chess.turn() === 'w' ? 'White' : 'Black'
             }`;
             document.getElementById('moveCount').textContent = moveCount;
+        }
+
+        function updateMoveList() {
+            const moveList = document.getElementById('moveList');
+            moveList.innerHTML = '';
+            const history = chess.history({ verbose: true });
+            history.forEach((move, index) => {
+                const moveItem = document.createElement('li');
+                moveItem.textContent = move.san;
+                moveList.appendChild(moveItem);
+            });
         }
 
         // Initialize the game
