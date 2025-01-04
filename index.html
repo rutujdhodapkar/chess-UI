@@ -328,6 +328,19 @@
             font-size: 1.2em; /* Increased font size for better visibility */
         }
 
+        .abort-button {
+            display: none;
+            background: linear-gradient(45deg, red, darkred);
+            border: none;
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            font-size: 1.2em;
+            margin-top: 10px;
+        }
+
         .player-timers {
             display: flex;
             justify-content: space-between;
@@ -405,7 +418,8 @@
                     <option value="180">3 minutes</option>
                     <option value="1800">30 minutes</option>
                 </select>
-                <button id="startGame" onclick="this.style.display='none'">Start Game</button>
+                <button id="startGame" onclick="startGame()">Start Game</button>
+                <button id="abortGame" class="abort-button" onclick="abortGame()">Abort/Resign</button>
             </div>
         </div>
     </div>
@@ -425,6 +439,7 @@
         let whiteTimerInterval;
         let blackTimerInterval;
         let gameStarted = false;
+        let isBoardFlipped = false;
 
         // Initialize chess.js
         const chess = new Chess();
@@ -452,8 +467,8 @@
                 for (let j = 0; j < 8; j++) {
                     const square = document.createElement('div');
                     square.className = `square ${(i + j) % 2 ? 'dark' : 'light'}`;
-                    square.dataset.row = i;
-                    square.dataset.col = j;
+                    square.dataset.row = isBoardFlipped ? 7 - i : i;
+                    square.dataset.col = isBoardFlipped ? 7 - j : j;
                     
                     const piece = position[i][j];
                     if (piece) {
@@ -525,6 +540,7 @@
                         document.getElementById('gameStatus').textContent = status;
                         clearInterval(whiteTimerInterval);
                         clearInterval(blackTimerInterval);
+                        resetTimers(); // Reset timers when game ends
                     } else {
                         switchTimers();
                     }
@@ -582,6 +598,7 @@
                     document.getElementById('gameStatus').textContent = status;
                     clearInterval(whiteTimerInterval);
                     clearInterval(blackTimerInterval);
+                    resetTimers(); // Reset timers when game ends
                 } else {
                     switchTimers();
                 }
@@ -748,7 +765,7 @@
             }
         }
 
-        function startTimer() {
+        function startGame() {
             const timerValue = parseInt(document.getElementById('timer').value);
             whiteTime = timerValue;
             blackTime = timerValue;
@@ -758,6 +775,36 @@
 
             gameStarted = true;
             switchTimers();
+
+            document.getElementById('startGame').style.display = 'none';
+            document.getElementById('abortGame').style.display = 'block';
+        }
+
+        function abortGame() {
+            clearInterval(whiteTimerInterval);
+            clearInterval(blackTimerInterval);
+            gameStarted = false;
+            alert('Game aborted/resigned.');
+            resetGame();
+            resetTimers(); // Reset timers when game is aborted
+        }
+
+        function resetGame() {
+            chess.reset();
+            createBoard();
+            document.getElementById('moveList').innerHTML = '';
+            document.getElementById('gameStatus').textContent = '';
+            document.getElementById('startGame').style.display = 'block';
+            document.getElementById('abortGame').style.display = 'none';
+            updateTimerDisplay('whiteTimer', 0);
+            updateTimerDisplay('blackTimer', 0);
+        }
+
+        function resetTimers() {
+            whiteTime = 0;
+            blackTime = 0;
+            updateTimerDisplay('whiteTimer', whiteTime);
+            updateTimerDisplay('blackTimer', blackTime);
         }
 
         function updateTimerDisplay(timerId, time) {
@@ -777,6 +824,7 @@
                         clearInterval(blackTimerInterval);
                         document.getElementById('gameStatus').textContent = 'Black wins by timeout!';
                         gameStarted = false;
+                        resetTimers(); // Reset timers when game ends by timeout
                     }
                 }, 1000);
             } else {
@@ -789,12 +837,13 @@
                         clearInterval(blackTimerInterval);
                         document.getElementById('gameStatus').textContent = 'White wins by timeout!';
                         gameStarted = false;
+                        resetTimers(); // Reset timers when game ends by timeout
                     }
                 }, 1000);
             }
         }
 
-        document.getElementById('startGame').addEventListener('click', startTimer);
+        document.getElementById('startGame').addEventListener('click', startGame);
 
         // Initialize the game
         createBoard();
