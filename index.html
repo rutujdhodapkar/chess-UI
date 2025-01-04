@@ -382,6 +382,74 @@
             top: -65px;
             right: 10px;
         }
+
+        .game-end-notification {
+    display: none;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(20, 20, 20, 0.85); /* Slightly darker and more transparent */
+    color: #f0f0f0; /* Brighter text for better contrast */
+    padding: 25px;
+    border-radius: 12px; /* More rounded corners */
+    text-align: center;
+    z-index: 1000;
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.6); /* Softer shadow for a modern look */
+    backdrop-filter: blur(12px); /* Enhanced glass effect */
+    animation: fadeIn 0.4s ease-in-out;
+}
+
+.game-end-notification h2 {
+    margin: 0 0 12px;
+    font-size: 2.2em;
+    font-weight: 500; /* Slightly bolder for emphasis */
+    color: #f0f0f0; /* Brighter text for better contrast */
+    font-family: 'Roboto', sans-serif; /* Modern font */
+    letter-spacing: 1.2px;
+    text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.6); /* Softer text shadow */
+}
+
+.game-end-notification p {
+    margin: 12px 0;
+    font-size: 1.3em;
+    line-height: 1.5;
+    color: #c0c0c0; /* Softer text color for contrast */
+    font-family: 'Roboto', sans-serif; /* Modern font */
+    max-width: 480px;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.4); /* Softer text shadow */
+}
+
+.game-end-notification button {
+    background: #5a5a5a; /* Sleeker gray color */
+    color: #ffffff;
+    padding: 12px 32px;
+    border-radius: 12px; /* More rounded corners */
+    cursor: pointer;
+    margin: 12px;
+    font-size: 1.1em;
+    font-family: 'Roboto', sans-serif; /* Modern font */
+    transition: background 0.3s ease, transform 0.3s ease; /* Added transform transition */
+    box-shadow: 0 5px 10px rgba(0, 0, 0, 0.5); /* Softer button shadow */
+}
+
+.game-end-notification button:hover {
+    background: #4a4a4a; /* Darker gray on hover */
+    transform: translateY(-3px); /* Slight lift on hover */
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3); /* Enhanced shadow on hover */
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translate(-50%, -60%);
+    }
+    to {
+        opacity: 1;
+        transform: translate(-50%, -50%);
+    }
+}
+
     </style>
 </head>
 <body>
@@ -422,6 +490,14 @@
                 <button id="abortGame" class="abort-button" onclick="abortGame()">Abort/Resign</button>
             </div>
         </div>
+    </div>
+
+    <div class="game-end-notification" id="gameEndNotification">
+        <h2 id="gameEndMessage"></h2>
+        <p id="gameEndAccuracy"></p>
+        <button onclick="reviewGame()">Review Game</button>
+        <button onclick="rematch()">Rematch</button>
+        <button onclick="newGame()">New Game</button>
     </div>
 
     <script>
@@ -541,6 +617,7 @@
                         clearInterval(whiteTimerInterval);
                         clearInterval(blackTimerInterval);
                         resetTimers(); // Reset timers when game ends
+                        showGameEndNotification(status);
                     } else {
                         switchTimers();
                     }
@@ -599,6 +676,7 @@
                     clearInterval(whiteTimerInterval);
                     clearInterval(blackTimerInterval);
                     resetTimers(); // Reset timers when game ends
+                    showGameEndNotification(status);
                 } else {
                     switchTimers();
                 }
@@ -825,6 +903,7 @@
                         document.getElementById('gameStatus').textContent = 'Black wins by timeout!';
                         gameStarted = false;
                         resetTimers(); // Reset timers when game ends by timeout
+                        showGameEndNotification('Black wins by timeout!');
                     }
                 }, 1000);
             } else {
@@ -838,9 +917,31 @@
                         document.getElementById('gameStatus').textContent = 'White wins by timeout!';
                         gameStarted = false;
                         resetTimers(); // Reset timers when game ends by timeout
+                        showGameEndNotification('White wins by timeout!');
                     }
                 }, 1000);
             }
+        }
+
+        function showGameEndNotification(message) {
+            const notification = document.getElementById('gameEndNotification');
+            const accuracyText = `White Accuracy: ${whiteAccuracy.toFixed(2)}%, Black Accuracy: ${blackAccuracy.toFixed(2)}%`;
+            document.getElementById('gameEndMessage').textContent = message;
+            document.getElementById('gameEndAccuracy').textContent = accuracyText;
+            notification.style.display = 'block';
+        }
+
+        function reviewGame() {
+            // Implement review game functionality
+        }
+
+        function rematch() {
+            resetGame();
+            startGame();
+        }
+
+        function newGame() {
+            resetGame();
         }
 
         document.getElementById('startGame').addEventListener('click', startGame);
