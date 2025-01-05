@@ -45,6 +45,11 @@
             backdrop-filter: blur(10px);
             border: 2px solid rgba(255,255,255,0.1);
             overflow: hidden;
+            transition: transform 0.5s ease;
+        }
+
+        .chessboard.flipped {
+            transform: rotate(180deg);
         }
 
         .chessboard::before {
@@ -328,19 +333,6 @@
             font-size: 1.2em; /* Increased font size for better visibility */
         }
 
-        .abort-button {
-            display: none;
-            background: linear-gradient(45deg, red, darkred);
-            border: none;
-            color: white;
-            padding: 15px;
-            border-radius: 8px;
-            cursor: pointer;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-            font-size: 1.2em;
-            margin-top: 10px;
-        }
-
         .player-timers {
             display: flex;
             justify-content: space-between;
@@ -383,73 +375,19 @@
             right: 10px;
         }
 
-        .game-end-notification {
-    display: none;
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    background: rgba(20, 20, 20, 0.85); /* Slightly darker and more transparent */
-    color: #f0f0f0; /* Brighter text for better contrast */
-    padding: 25px;
-    border-radius: 12px; /* More rounded corners */
-    text-align: center;
-    z-index: 1000;
-    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.6); /* Softer shadow for a modern look */
-    backdrop-filter: blur(12px); /* Enhanced glass effect */
-    animation: fadeIn 0.4s ease-in-out;
-}
-
-.game-end-notification h2 {
-    margin: 0 0 12px;
-    font-size: 2.2em;
-    font-weight: 500; /* Slightly bolder for emphasis */
-    color: #f0f0f0; /* Brighter text for better contrast */
-    font-family: 'Roboto', sans-serif; /* Modern font */
-    letter-spacing: 1.2px;
-    text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.6); /* Softer text shadow */
-}
-
-.game-end-notification p {
-    margin: 12px 0;
-    font-size: 1.3em;
-    line-height: 1.5;
-    color: #c0c0c0; /* Softer text color for contrast */
-    font-family: 'Roboto', sans-serif; /* Modern font */
-    max-width: 480px;
-    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.4); /* Softer text shadow */
-}
-
-.game-end-notification button {
-    background: #5a5a5a; /* Sleeker gray color */
-    color: #ffffff;
-    padding: 12px 32px;
-    border-radius: 12px; /* More rounded corners */
-    cursor: pointer;
-    margin: 12px;
-    font-size: 1.1em;
-    font-family: 'Roboto', sans-serif; /* Modern font */
-    transition: background 0.3s ease, transform 0.3s ease; /* Added transform transition */
-    box-shadow: 0 5px 10px rgba(0, 0, 0, 0.5); /* Softer button shadow */
-}
-
-.game-end-notification button:hover {
-    background: #4a4a4a; /* Darker gray on hover */
-    transform: translateY(-3px); /* Slight lift on hover */
-    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3); /* Enhanced shadow on hover */
-}
-
-@keyframes slideIn {
-    from {
-        opacity: 0;
-        transform: translate(-50%, -60%);
-    }
-    to {
-        opacity: 1;
-        transform: translate(-50%, -50%);
-    }
-}
-
+        .flip-button {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: linear-gradient(45deg, #ff8c00, #ff4500);
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            font-size: 1em;
+        }
     </style>
 </head>
 <body>
@@ -458,6 +396,7 @@
             <div id="chessboard" class="chessboard"></div>
             <div class="white-timer" id="whiteTimer">00:00</div>
             <div class="black-timer" id="blackTimer">00:00</div>
+            <button class="flip-button" id="flipButton">Flip Board</button>
         </div>
         <div class="info-container">
             <div class="game-info">
@@ -486,18 +425,9 @@
                     <option value="180">3 minutes</option>
                     <option value="1800">30 minutes</option>
                 </select>
-                <button id="startGame" onclick="startGame()">Start Game</button>
-                <button id="abortGame" class="abort-button" onclick="abortGame()">Abort/Resign</button>
+                <button id="startGame">Start Game</button>
             </div>
         </div>
-    </div>
-
-    <div class="game-end-notification" id="gameEndNotification">
-        <h2 id="gameEndMessage"></h2>
-        <p id="gameEndAccuracy"></p>
-        <button onclick="reviewGame()">Review Game</button>
-        <button onclick="rematch()">Rematch</button>
-        <button onclick="newGame()">New Game</button>
     </div>
 
     <script>
@@ -515,7 +445,7 @@
         let whiteTimerInterval;
         let blackTimerInterval;
         let gameStarted = false;
-        let isBoardFlipped = false;
+        let boardFlipped = false;
 
         // Initialize chess.js
         const chess = new Chess();
@@ -542,9 +472,11 @@
             for (let i = 0; i < 8; i++) {
                 for (let j = 0; j < 8; j++) {
                     const square = document.createElement('div');
-                    square.className = `square ${(i + j) % 2 ? 'dark' : 'light'}`;
-                    square.dataset.row = isBoardFlipped ? 7 - i : i;
-                    square.dataset.col = isBoardFlipped ? 7 - j : j;
+                    const row = boardFlipped ? 7 - i : i;
+                    const col = boardFlipped ? 7 - j : j;
+                    square.className = `square ${(row + col) % 2 ? 'dark' : 'light'}`;
+                    square.dataset.row = row;
+                    square.dataset.col = col;
                     
                     const piece = position[i][j];
                     if (piece) {
@@ -616,8 +548,6 @@
                         document.getElementById('gameStatus').textContent = status;
                         clearInterval(whiteTimerInterval);
                         clearInterval(blackTimerInterval);
-                        resetTimers(); // Reset timers when game ends
-                        showGameEndNotification(status);
                     } else {
                         switchTimers();
                     }
@@ -675,8 +605,6 @@
                     document.getElementById('gameStatus').textContent = status;
                     clearInterval(whiteTimerInterval);
                     clearInterval(blackTimerInterval);
-                    resetTimers(); // Reset timers when game ends
-                    showGameEndNotification(status);
                 } else {
                     switchTimers();
                 }
@@ -843,7 +771,7 @@
             }
         }
 
-        function startGame() {
+        function startTimer() {
             const timerValue = parseInt(document.getElementById('timer').value);
             whiteTime = timerValue;
             blackTime = timerValue;
@@ -853,36 +781,6 @@
 
             gameStarted = true;
             switchTimers();
-
-            document.getElementById('startGame').style.display = 'none';
-            document.getElementById('abortGame').style.display = 'block';
-        }
-
-        function abortGame() {
-            clearInterval(whiteTimerInterval);
-            clearInterval(blackTimerInterval);
-            gameStarted = false;
-            alert('Game aborted/resigned.');
-            resetGame();
-            resetTimers(); // Reset timers when game is aborted
-        }
-
-        function resetGame() {
-            chess.reset();
-            createBoard();
-            document.getElementById('moveList').innerHTML = '';
-            document.getElementById('gameStatus').textContent = '';
-            document.getElementById('startGame').style.display = 'block';
-            document.getElementById('abortGame').style.display = 'none';
-            updateTimerDisplay('whiteTimer', 0);
-            updateTimerDisplay('blackTimer', 0);
-        }
-
-        function resetTimers() {
-            whiteTime = 0;
-            blackTime = 0;
-            updateTimerDisplay('whiteTimer', whiteTime);
-            updateTimerDisplay('blackTimer', blackTime);
         }
 
         function updateTimerDisplay(timerId, time) {
@@ -902,8 +800,6 @@
                         clearInterval(blackTimerInterval);
                         document.getElementById('gameStatus').textContent = 'Black wins by timeout!';
                         gameStarted = false;
-                        resetTimers(); // Reset timers when game ends by timeout
-                        showGameEndNotification('Black wins by timeout!');
                     }
                 }, 1000);
             } else {
@@ -916,35 +812,22 @@
                         clearInterval(blackTimerInterval);
                         document.getElementById('gameStatus').textContent = 'White wins by timeout!';
                         gameStarted = false;
-                        resetTimers(); // Reset timers when game ends by timeout
-                        showGameEndNotification('White wins by timeout!');
                     }
                 }, 1000);
             }
         }
 
-        function showGameEndNotification(message) {
-            const notification = document.getElementById('gameEndNotification');
-            const accuracyText = `White Accuracy: ${whiteAccuracy.toFixed(2)}%, Black Accuracy: ${blackAccuracy.toFixed(2)}%`;
-            document.getElementById('gameEndMessage').textContent = message;
-            document.getElementById('gameEndAccuracy').textContent = accuracyText;
-            notification.style.display = 'block';
-        }
+        document.getElementById('startGame').addEventListener('click', startTimer);
 
-        function reviewGame() {
-            // Implement review game functionality
-        }
-
-        function rematch() {
-            resetGame();
-            startGame();
-        }
-
-        function newGame() {
-            resetGame();
-        }
-
-        document.getElementById('startGame').addEventListener('click', startGame);
+        document.getElementById('flipButton').addEventListener('click', () => {
+            boardFlipped = !boardFlipped;
+            board.classList.toggle('flipped');
+            createBoard();
+            // Correct the piece direction after flipping the board
+            document.querySelectorAll('.piece').forEach(piece => {
+                piece.style.transform = boardFlipped ? 'rotate(180deg)' : 'rotate(0deg)';
+            });
+        });
 
         // Initialize the game
         createBoard();
